@@ -11,138 +11,143 @@ const request = require("request");
 module.exports = NodeHelper.create({
 
     start: function () {
-
         console.log(this.name + " helper started ...");
-
     },
 
 
     socketNotificationReceived: function (notification, payload) {
-
-        if (notification === "FETCH_DATA") {
-
-            this.fetchData(payload);
-
+        console.log(this.name + " received module notification: " + notification);
+        var self = this;
+        if (notification === "FETCH_TODO_DATA") {
+            this.config = payload;
+            this.getToken()
+                .then(token => {
+                    self.getLists(token);
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+        } else if (notification === "GET_TASKS") {
+            this.getToken()
+                .then(token => {
+                    self.getTasks(payload, token);
+                })
+                .catch(error => {
+                    console.error(error);
+                });;
         } else {
-
-          console.log(this.name + " - Did not process event: " + notification);
-
+            console.log(this.name + " - Did not process event: " + notification);
         }
-
     },
 
-    getTodos: function (config) {
 
+    getToken: function() {
         // copy context to be available inside callbacks
         var self = this;
 
         // get access token
-        var tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-        var refreshToken = config.oauth2RefreshToken;
-        var data = {
-            client_id: config.oauth2ClientId,
-            scope: "offline_access user.read tasks.read",
-            refresh_token: refreshToken,
-            grant_type: "refresh_token",
-            client_secret: config.oauth2ClientSecret
-        }
-        request.post({
-                url: tokenUrl,
-                form: data
-            },
-            function (error, response, body) {
+        return new Promise(function(resolve, reject) {
+            var tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+            var refreshToken = self.config.refreshToken;
+            var data = {
+                client_id: self.config.clientId,
+                ressource: "https://graph.microsoft.com",
+                scope: "offline_access user.read tasks.read",
+                refresh_token: refreshToken,
+                grant_type: "refresh_token",
+                client_secret: self.config.clientSecret
+            };
+            console.log(self.name + " - Requesting Access Token...");
+            request.post(
+                {
+                    url: tokenUrl,
+                    form: data
+                },
+                function (error, response, body) {
+                    if (error) {
+                        console.log(self.name + " - Error while requesting access token: ");
+                        console.log(error);
+                        self.sendSocketNotification("FETCH_INFO_ERROR", error);
+                        reject(error);
+                    } else {
+                        console.log(self.name + " - Successfully requested access token");
+                        var accessTokenJson = JSON.parse(body);
+                        var accessToken = accessTokenJson.access_token;
+                        console.log(accessToken);
+                        resolve(accessToken);
+                    }
+                }
+            );
+        });
+    },
 
-                if (error) {
 
-                    console.log(this.name + " - Error while requesting access token:");
-                    console.log(error);
+    getLists: function(accessToken) {
+        var self = this;
 
-                    self.sendSocketNotification("FETCH_INFO_ERROR", error);
+        console.log(this.name + " - Requesting Todo Lists...");
+        var taskFoldersUrl = "https://graph.microsoft.com/beta/me/outlook/taskFolders/?$top=200";
+        request.get({
+            url: taskFoldersUrl,
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        }, function (error, response, body) {
+            if (error) {
+                console.log(this.name + " - Error while requesting task lists:");
+                console.log(error);
+                self.sendSocketNotification("FETCH_INFO_ERROR", error);
+                return;
+            } else {
+                // parse response from Microsoft
+                var lists = JSON.parse(body);
+                //console.log(JSON.stringify(lists));
 
-                    return;
-
+                for (var i = 0; i < lists.value.length; i++) {
+                    console.log("List: " + lists.value[i].name);
                 }
 
-                const accessTokenJson = JSON.parse(body);
-                var accessToken = accessTokenJson.access_token;
+                // set listID to default task list "Tasks"
+                var listId = "";
+                lists.value.forEach(element => element.isDefaultFolder ? listId = element.id : '' );
+                console.log("Default ListId: "+listId);
 
-                // get tasks
-                var _getTodos = function(){
+                self.sendSocketNotification("LISTS", lists.value);
 
-                  var listUrl = "https://graph.microsoft.com/beta/me/outlook/taskFolders/" + config.listId + "/tasks?$select=subject,status&$top=" + config.itemLimit + "&$filter=status%20ne%20%27completed%27"
-
-                  request.get({
-                      url: listUrl,
-                      headers: {
-                          'Authorization': 'Bearer ' + accessToken
-                      }
-                  }, function (error, response, body) {
-
-                      if (error) {
-
-                          console.log(this.name + " - Error while requesting tasks:");
-                          console.log(error);
-
-                          self.sendSocketNotification("FETCH_INFO_ERROR", error);
-
-                          return;
-                      }
-
-                      // send tasks to front-end
-                      const tasksJson = JSON.parse(body);
-                      self.sendSocketNotification("DATA_FETCHED_" + config.id, tasksJson.value);
-
-                  });
-                };
-
-                // if list ID was provided, retrieve its tasks
-                if(config.listId !== undefined && config.listId != "") {
-
-                  _getTodos();
-
-                } // if
-                // otherwise identify the list ID of the default task list first
-                else {
-
-                  var taksFoldersUrl = "https://graph.microsoft.com/beta/me/outlook/taskFolders/?$top=200";
-
-                  request.get({
-                      url: taksFoldersUrl,
-                      headers: {
-                          'Authorization': 'Bearer ' + accessToken
-                      }
-                  }, function (error, response, body) {
-
-                      if (error) {
-
-                          console.log(this.name + " - Error while requesting task folders:");
-                          console.log(error);
-
-                          self.sendSocketNotification("FETCH_INFO_ERROR", error);
-
-                          return;
-                      }
-
-                      // parse response from Microsoft
-                      var list = JSON.parse(body);
-
-                      // set listID to default task list "Tasks"
-                      list.value.forEach(element => element.isDefaultFolder ? config.listId = element.id : '' );
-
-                      // based on new configuration data (listId), get tasks
-                      _getTodos();
-
-                  } // function callback for task folders
-                );
-
-              } // else
-
-            });
+                // based on new configuration data (listId), get tasks
+                self.getTasks(listId, accessToken);
+            }
+        });
     },
 
-    fetchData: function (config) {
 
-        this.getTodos(config);
+    getTasks: function(listId, accessToken) {
+        console.log(this.name + " - Getting ToDo Tasks for list "+listId);
+        //var listUrl = "https://graph.microsoft.com/beta/me/outlook/taskFolders/" + listId + "/tasks?$select=subject,status&$top=" + this.config.itemLimit + "&$filter=status%20ne%20%27completed%27"
+        var listUrl = "https://graph.microsoft.com/beta/me/outlook/taskFolders/" + listId + "/tasks?$top=" + this.config.itemLimit;
+        var self = this;
+        request.get({
+            url: listUrl,
+            headers: {
+               'Authorization': 'Bearer ' + accessToken
+            }
+        }, function (error, response, body) {
 
+            if (error || body.error) {
+                console.log(self.name + " - Error while requesting tasks: ");
+                console.log(error);
+                self.sendSocketNotification("FETCH_INFO_ERROR", error);
+                return;
+            } else {
+                // send tasks to front-end
+                var tasksJson = JSON.parse(body);
+                for (var i = 0; i < tasksJson.value.length; i++) {
+                    if (tasksJson.value[i].status != "completed") {
+                        console.log(JSON.stringify(tasksJson.value[i]));
+                    }
+                }
+                self.sendSocketNotification("TASKS", tasksJson.value);
+            }
+        });
     },
+
+
 });

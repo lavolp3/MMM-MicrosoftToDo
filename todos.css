@@ -1,0 +1,158 @@
+
+/*
+*  DROPDOWN TITLE
+*/
+
+.todo-dropdown-title {
+    position: relative;
+}
+.todo-titleBtn {
+    background: none;
+    margin: 4px 5px;
+    padding: 4px 12px;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+
+.todo-titleBtn:hover {
+    background-color: #2980B9;
+}
+
+#todo-dropList {
+    #position: relative;
+    display: inline-block;
+}
+
+#todo-dropList .show {
+    display: block;
+}
+
+#todo-dropItems {
+    display: none;
+    position: absolute;
+    padding: 0px 12px;
+    min-width: 160px;
+    top: 70px;
+    left: 10px;
+    background-color: 'rgba(0, 0, 0, 1)';
+}
+
+
+.todo-dropItem {
+    color: white;
+    padding: 5px 5px;
+    display: block;
+    overflow: auto;
+    position: relative;
+    z-index: 2;
+    font-size: 0.7em;
+}
+
+.todo-dropItem:not(:last-child) {
+    border-bottom: 2px solid white;
+}
+
+.todo-dropItem:hover {
+    background-color: #2980B9;
+}
+
+
+/*** ADD BUTTON ***/
+.todo-addBtn {
+  float: right;
+  margin-right: 50px;
+  padding: 3px;
+  font-size: 30px;
+}
+
+
+/*** LIST ***/
+
+.todo-container ul {
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  list-style: none;
+}
+
+/* Style the list items */
+
+.todo-task {
+  display: block;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  padding: 13px 13px 13px 40px;
+  background-color: rgba(100, 100, 100, 0.4);
+  border-radius: 8px;
+  margin: 10px 0px;
+  transition: 0.2s;
+  color: #eee;
+  font-size: 22px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.taskbox {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+/* Create a custom checkbox */
+.pseudobox {
+  position: absolute;
+  top: 13px;
+  left: 8px;
+  height: 25px;
+  width: 25px;
+  border: 1px solid #bbb;
+  border-radius: 7px;
+}
+
+/* When the checkbox is checked, add a blue background */
+.taskbox:checked ~ .pseudobox {
+  background-color: #000;
+}
+
+/* Show the checkmark when checked */
+.taskbox:checked ~ .pseudobox:after {
+  display: block;
+}
+
+/* Style the checkmark/indicator */
+.pseudobox:after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 8px;
+  top: 3px;
+  width: 6px;
+  height: 13px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  -webkit-transform: rotate(45deg);
+  -ms-transform: rotate(45deg);
+  transform: rotate(45deg);
+}
+
+.todo-task.checked {
+    background: none;
+    color: #ccc;
+    text-decoration: line-through;
+}
+
+.delete-todo {
+  position: absolute;
+  right: 5px;
+  font-size: 25px;
+  background:  none;
+  color:  red;
+  border:  none;
+}
